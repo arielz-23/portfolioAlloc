@@ -15,7 +15,7 @@ Book3.xlsx
 # Data – raw and processed files are reproducible; don't commit large binaries
 data/raw/
 data/processed/
-data/artifacts/
+data/artifacts/*.csv
 
 # Keep directory structure
 !data/raw/.gitkeep

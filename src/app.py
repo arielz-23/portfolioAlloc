@@ -9,6 +9,7 @@ Run main.py first to generate them.
 """
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -355,6 +356,62 @@ def main() -> None:
                 file_name="model_card.md",
                 mime="text/markdown",
             )
+
+    # ── AI Insights ───────────────────────────────────────────────────────
+    st.markdown("---")
+    st.markdown("## 🤖 AI Insights")
+    st.caption("Live streaming analysis from 3 Claude AI agents · Requires ANTHROPIC_API_KEY")
+
+    _api_key = os.getenv("ANTHROPIC_API_KEY", "")
+    if not _api_key:
+        st.warning(
+            "Add your Anthropic API key to `.env` to enable AI Insights:\n"
+            "```\nANTHROPIC_API_KEY=sk-ant-...\n```"
+        )
+    else:
+        tab_market, tab_strategy, tab_risk = st.tabs([
+            "📊 Market Analyst",
+            "🎯 Portfolio Strategist",
+            "⚠️ Risk Monitor",
+        ])
+
+        with tab_market:
+            st.markdown(
+                "Reads the latest macro snapshot (VIX, yield spread, Fed Funds, CPI, etc.) and "
+                "identifies the current market regime with sector-level implications."
+            )
+            if panel is None:
+                st.info("Feature panel unavailable — run `python main.py` first.")
+            elif st.button("▶ Run Market Analysis", key="btn_market"):
+                try:
+                    from agents import market_analyst_stream
+                    st.write_stream(market_analyst_stream(panel, alloc))
+                except Exception as exc:
+                    st.error(f"Agent error: {exc}")
+
+        with tab_strategy:
+            st.markdown(
+                "Reviews the ML-generated allocation for concentration risk, rotation "
+                "opportunities, and potential model blind spots."
+            )
+            if st.button("▶ Run Portfolio Review", key="btn_strategy"):
+                try:
+                    from agents import portfolio_strategist_stream
+                    st.write_stream(portfolio_strategist_stream(alloc, metrics, feat_imp))
+                except Exception as exc:
+                    st.error(f"Agent error: {exc}")
+
+        with tab_risk:
+            st.markdown(
+                "Monitors drawdown, 63-day annualised volatility, and position concentration. "
+                "Returns a 🟢/🟡/🔴 traffic-light rating with specific escalation thresholds."
+            )
+            if st.button("▶ Run Risk Assessment", key="btn_risk"):
+                try:
+                    from agents import risk_monitor_stream
+                    st.write_stream(risk_monitor_stream(backtest, alloc))
+                except Exception as exc:
+                    st.error(f"Agent error: {exc}")
 
     st.caption("This dashboard is for academic / educational use only. Not financial advice.")
 

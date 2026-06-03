@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ETF Sector Rotation Dashboard</title>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
+  <style>
+    /* ── Design tokens ──────────────────────────────────────────────── */
+    :root {
+      --bg:       #080d1a;
+      --surface:  #0f172a;
+      --card:     #131f35;
+      --border:   #1e3050;
+      --hover:    #1a2d4a;
+      --text:     #e8f0fe;
+      --muted:    #7a92b8;
+      --accent:   #4f8ef7;
+      --accent2:  #818cf8;
+      --green:    #22d3a5;
+      --red:      #f87171;
+      --yellow:   #fbbf24;
+      --shadow:   0 4px 24px rgba(0,0,0,.45);
+      --radius:   12px;
+      --font:     -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif;
+    }
+
+    /* ── Reset & base ───────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 14px;
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+    a { color: var(--accent); text-decoration: none; }
+
+    /* ── Header ─────────────────────────────────────────────────────── */
+    header {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(8,13,26,.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 32px;
+      height: 60px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .header-left { display: flex; align-items: center; gap: 12px; }
+    .header-icon { font-size: 22px; }
+    .header-title { font-size: 17px; font-weight: 700; letter-spacing: -.3px; }
+    .header-sub { font-size: 11px; color: var(--muted); }
+    #status-badge {
+      font-size: 11px; font-weight: 600; padding: 3px 10px;
+      border-radius: 20px; border: 1px solid var(--border);
+      background: var(--card);
+    }
+    #status-badge.ok  { color: var(--green); border-color: var(--green); }
+    #status-badge.err { color: var(--red);   border-color: var(--red); }
+
+    /* ── Layout ─────────────────────────────────────────────────────── */
+    main { max-width: 1440px; margin: 0 auto; padding: 28px 32px 60px; }
+    section { margin-bottom: 36px; }
+    .section-title {
+      font-size: 15px; font-weight: 700; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 1px;
+      margin-bottom: 16px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .section-title::after {
+      content: ''; flex: 1; height: 1px; background: var(--border);
+    }
+
+    /* ── Cards ──────────────────────────────────────────────────────── */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    .card-body { padding: 20px 24px; }
+
+    /* ── KPI grid ───────────────────────────────────────────────────── */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+    }
+    .kpi-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 22px;
+      display: flex; flex-direction: column; gap: 4px;
+      transition: border-color .2s;
+    }
+    .kpi-card:hover { border-color: var(--accent); }
+    .kpi-card.model  { border-top: 3px solid var(--accent); }
+    .kpi-card.ew     { border-top: 3px solid var(--yellow); }
+    .kpi-card.spy    { border-top: 3px solid var(--green); }
+    .kpi-label  { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .8px; color: var(--muted); }
+    .kpi-value  { font-size: 28px; font-weight: 800; letter-spacing: -1px; }
+    .kpi-delta  { font-size: 12px; color: var(--muted); }
+    .kpi-value.pos { color: var(--green); }
+    .kpi-value.neg { color: var(--red); }
+
+    /* ── Chart containers ───────────────────────────────────────────── */
+    .chart-box {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 8px;
+      box-shadow: var(--shadow);
+    }
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 900px) { .two-col { grid-template-columns: 1fr; } }
+
+    /* ── Metrics table ──────────────────────────────────────────────── */
+    .table-wrap { overflow-x: auto; }
+    table {
+      width: 100%; border-collapse: collapse; font-size: 13px;
+    }
+    th, td { padding: 10px 14px; text-align: right; border-bottom: 1px solid var(--border); }
+    th { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px;
+         color: var(--muted); position: sticky; top: 0; background: var(--card); }
+    td:first-child, th:first-child { text-align: left; color: var(--text); }
+    tr:hover td { background: var(--hover); }
+
+    /* ── AI Insights ────────────────────────────────────────────────── */
+    .agents-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+    @media (max-width: 1100px) { .agents-grid { grid-template-columns: 1fr; } }
+
+    .agent-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      display: flex; flex-direction: column;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .agent-header {
+      padding: 16px 20px 12px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: flex-start; gap: 12px;
+    }
+    .agent-icon { font-size: 22px; flex-shrink: 0; margin-top: 2px; }
+    .agent-name { font-size: 14px; font-weight: 700; }
+    .agent-desc { font-size: 12px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
+
+    .agent-body { flex: 1; padding: 16px 20px; }
+
+    .run-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: var(--accent); color: #fff;
+      border: none; border-radius: 8px;
+      padding: 8px 18px; font-size: 13px; font-weight: 600;
+      cursor: pointer; transition: background .15s, transform .1s;
+      width: 100%; justify-content: center; margin-bottom: 14px;
+    }
+    .run-btn:hover  { background: #3a7de8; }
+    .run-btn:active { transform: scale(.97); }
+    .run-btn:disabled { background: var(--border); color: var(--muted); cursor: not-allowed; }
+
+    .agent-output {
+      min-height: 80px; max-height: 520px; overflow-y: auto;
+      font-size: 13px; line-height: 1.75;
+      color: var(--text);
+    }
+    .agent-output.empty { color: var(--muted); font-style: italic; }
+    .agent-output::-webkit-scrollbar { width: 4px; }
+    .agent-output::-webkit-scrollbar-track { background: transparent; }
+    .agent-output::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    /* Markdown rendered inside agent output */
+    .agent-output h2 {
+      font-size: 13px; font-weight: 700; color: var(--accent);
+      margin: 16px 0 6px; text-transform: uppercase; letter-spacing: .5px;
+    }
+    .agent-output h2:first-child { margin-top: 0; }
+    .agent-output p  { margin-bottom: 8px; }
+    .agent-output ul, .agent-output ol { padding-left: 18px; margin-bottom: 8px; }
+    .agent-output li { margin-bottom: 4px; }
+    .agent-output strong { color: #c8d8f8; }
+    .agent-output code {
+      background: rgba(79,142,247,.12); color: var(--accent);
+      padding: 1px 5px; border-radius: 4px; font-size: .9em;
+    }
+
+    /* Typing cursor during stream */
+    .cursor::after {
+      content: '▋'; animation: blink .7s step-end infinite;
+      color: var(--accent);
+    }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    /* Error state */
+    .agent-error {
+      color: var(--red); font-size: 13px;
+      padding: 10px; background: rgba(248,113,113,.08);
+      border-radius: 6px; border: 1px solid rgba(248,113,113,.2);
+    }
+
+    /* ── Loading skeleton ───────────────────────────────────────────── */
+    .skeleton {
+      background: linear-gradient(90deg, var(--card) 25%, var(--hover) 50%, var(--card) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.4s infinite;
+      border-radius: 6px; height: 18px; margin-bottom: 8px;
+    }
+    @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+    /* ── Banner ─────────────────────────────────────────────────────── */
+    #no-data-banner {
+      display: none;
+      background: rgba(251,191,36,.08);
+      border: 1px solid rgba(251,191,36,.3);
+      border-radius: var(--radius);
+      padding: 14px 20px;
+      color: var(--yellow);
+      margin-bottom: 24px;
+      font-size: 13px;
+    }
+
+    /* ── Footer ─────────────────────────────────────────────────────── */
+    footer {
+      text-align: center; padding: 24px;
+      color: var(--muted); font-size: 12px;
+      border-top: 1px solid var(--border);
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ──────────────────────────────────────────────────────── -->
+<header>
+  <div class="header-left">
+    <span class="header-icon">📈</span>
+    <div>
+      <div class="header-title">ETF Sector Rotation Dashboard</div>
+      <div class="header-sub">XGBoost · Vertex AI Gemini · University Final Project</div>
+    </div>
+  </div>
+  <span id="status-badge">Loading…</span>
+</header>
+
+<main>
+
+  <!-- ── No-data banner ──────────────────────────────────────────── -->
+  <div id="no-data-banner">
+    ⚠️ Artifacts not found. Run <code>python main.py</code> to generate the pipeline outputs,
+    then restart the server.
+  </div>
+
+  <!-- ── KPIs ────────────────────────────────────────────────────── -->
+  <section>
+    <div class="section-title">📊 Performance Summary</div>
+    <div class="kpi-grid" id="kpi-grid">
+      <div class="skeleton" style="height:100px;"></div>
+      <div class="skeleton" style="height:100px;"></div>
+      <div class="skeleton" style="height:100px;"></div>
+      <div class="skeleton" style="height:100px;"></div>
+    </div>
+  </section>
+
+  <!-- ── Full metrics table ──────────────────────────────────────── -->
+  <section>
+    <details>
+      <summary style="cursor:pointer;color:var(--muted);font-size:13px;font-weight:600;user-select:none;">
+        ▸ Full Performance Metrics Table
+      </summary>
+      <div class="card" style="margin-top:12px;">
+        <div class="card-body table-wrap">
+          <table id="metrics-table"><tbody><tr><td style="color:var(--muted)">Loading…</td></tr></tbody></table>
+        </div>
+      </div>
+    </details>
+  </section>
+
+  <!-- ── Equity Curve ─────────────────────────────────────────────── -->
+  <section>
+    <div class="section-title">📈 Equity Curve</div>
+    <div class="chart-box"><div id="chart-equity" style="height:420px;"></div></div>
+  </section>
+
+  <!-- ── Drawdown ─────────────────────────────────────────────────── -->
+  <section>
+    <div class="section-title">📉 Drawdown</div>
+    <div class="chart-box"><div id="chart-drawdown" style="height:320px;"></div></div>
+  </section>
+
+  <!-- ── Allocation ───────────────────────────────────────────────── -->
+  <section>
+    <div class="section-title">🏦 Current Sector Allocation</div>
+    <div class="two-col">
+      <div class="chart-box"><div id="chart-alloc" style="height:360px;"></div></div>
+      <div class="chart-box"><div id="chart-ranking" style="height:360px;"></div></div>
+    </div>
+  </section>
+
+  <!-- ── Feature Importance ──────────────────────────────────────── -->
+  <section>
+    <div class="section-title">🔍 Top 20 Features by Importance</div>
+    <div class="chart-box"><div id="chart-features" style="height:480px;"></div></div>
+  </section>
+
+  <!-- ── ETF Prices ──────────────────────────────────────────────── -->
+  <section>
+    <div class="section-title">💹 ETF Price History (normalised)</div>
+    <div class="chart-box"><div id="chart-etf" style="height:400px;"></div></div>
+  </section>
+
+  <!-- ── AI Insights ─────────────────────────────────────────────── -->
+  <section>
+    <div class="section-title">🤖 AI Insights — Vertex AI Gemini</div>
+    <div class="agents-grid">
+
+      <!-- Agent 1 -->
+      <div class="agent-card">
+        <div class="agent-header">
+          <span class="agent-icon">📊</span>
+          <div>
+            <div class="agent-name">Market Analyst</div>
+            <div class="agent-desc">Reads the latest macro snapshot and identifies the current market regime with sector-level implications.</div>
+          </div>
+        </div>
+        <div class="agent-body">
+          <button class="run-btn" id="btn-market" onclick="runAgent('market-analyst','out-market','btn-market')">
+            ▶ Run Analysis
+          </button>
+          <div class="agent-output empty" id="out-market">Analysis will appear here after you click Run.</div>
+        </div>
+      </div>
+
+      <!-- Agent 2 -->
+      <div class="agent-card">
+        <div class="agent-header">
+          <span class="agent-icon">🎯</span>
+          <div>
+            <div class="agent-name">Portfolio Strategist</div>
+            <div class="agent-desc">Reviews the ML-generated allocation for concentration risk, rotation opportunities, and model blind spots.</div>
+          </div>
+        </div>
+        <div class="agent-body">
+          <button class="run-btn" id="btn-strategy" onclick="runAgent('portfolio-strategist','out-strategy','btn-strategy')">
+            ▶ Run Review
+          </button>
+          <div class="agent-output empty" id="out-strategy">Analysis will appear here after you click Run.</div>
+        </div>
+      </div>
+
+      <!-- Agent 3 -->
+      <div class="agent-card">
+        <div class="agent-header">
+          <span class="agent-icon">⚠️</span>
+          <div>
+            <div class="agent-name">Risk Monitor</div>
+            <div class="agent-desc">Monitors drawdown, HHI concentration, and 63-day vol. Issues a 🟢/🟡/🔴 traffic-light risk rating.</div>
+          </div>
+        </div>
+        <div class="agent-body">
+          <button class="run-btn" id="btn-risk" onclick="runAgent('risk-monitor','out-risk','btn-risk')">
+            ▶ Run Assessment
+          </button>
+          <div class="agent-output empty" id="out-risk">Analysis will appear here after you click Run.</div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  ETF Sector Rotation Dashboard · University ML Final Project ·
+  Powered by XGBoost + Vertex AI Gemini ·
+  <em>Not financial advice</em>
+</footer>
+
+<!-- ── JavaScript ──────────────────────────────────────────────────── -->
+<script>
+'use strict';
+
+/* ── Plotly shared config ─────────────────────────────────────────── */
+const PLOTLY_CFG = { responsive: true, displayModeBar: false };
+const DARK = {
+  paper_bgcolor: 'rgba(0,0,0,0)',
+  plot_bgcolor:  'rgba(0,0,0,0)',
+  font:          { color: '#e8f0fe', family: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', size: 12 },
+  xaxis:         { gridcolor: '#1e3050', linecolor: '#1e3050', zerolinecolor: '#1e3050' },
+  yaxis:         { gridcolor: '#1e3050', linecolor: '#1e3050', zerolinecolor: '#1e3050' },
+  legend:        { bgcolor: 'rgba(0,0,0,0)', bordercolor: '#1e3050' },
+  margin:        { t: 40, r: 20, b: 50, l: 60 },
+};
+const PALETTE = ['#4f8ef7', '#fbbf24', '#22d3a5', '#f87171', '#a78bfa', '#fb923c'];
+
+function layout(overrides = {}) {
+  return Object.assign({}, DARK, overrides);
+}
+
+/* ── Fetch helpers ────────────────────────────────────────────────── */
+async function api(path) {
+  const r = await fetch(path);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+}
+
+/* ── Status badge ─────────────────────────────────────────────────── */
+async function checkStatus() {
+  try {
+    const s = await api('/api/status');
+    const badge = document.getElementById('status-badge');
+    if (s.ready) {
+      badge.textContent = '● Live';
+      badge.className = 'ok';
+    } else {
+      badge.textContent = '● No data';
+      badge.className = 'err';
+      document.getElementById('no-data-banner').style.display = 'block';
+    }
+  } catch {
+    const badge = document.getElementById('status-badge');
+    badge.textContent = '● Offline';
+    badge.className = 'err';
+  }
+}
+
+/* ── KPI cards ────────────────────────────────────────────────────── */
+async function renderKPIs() {
+  const { metrics } = await api('/api/metrics');
+  if (!metrics || !metrics.length) return;
+
+  const rows = {};
+  for (const row of metrics) {
+    rows[row.metric] = row;
+  }
+
+  const kpiDefs = [
+    { key: 'model',        label: 'Model (Rotation)', cls: 'model',
+      primary: 'CAGR', secondary: 'Sharpe Ratio' },
+    { key: 'equal_weight', label: 'Equal-Weight Sectors', cls: 'ew',
+      primary: 'CAGR', secondary: 'Sharpe Ratio' },
+    { key: 'spy',          label: 'SPY Benchmark', cls: 'spy',
+      primary: 'CAGR', secondary: 'Sharpe Ratio' },
+    { key: 'model',        label: 'Max Drawdown', cls: 'model',
+      primary: 'Max Drawdown', secondary: 'Calmar Ratio' },
+  ];
+
+  const html = kpiDefs.map(d => {
+    const primary   = (rows[d.primary]   || {})[d.key] || '–';
+    const secondary = (rows[d.secondary] || {})[d.key] || '–';
+    const isNeg = typeof primary === 'string' && primary.startsWith('-');
+    const isBig = typeof primary === 'string' && primary.endsWith('%');
+    return `
+      <div class="kpi-card ${d.cls}">
+        <div class="kpi-label">${d.label}</div>
+        <div class="kpi-value ${isNeg ? 'neg' : 'pos'}">${primary}</div>
+        <div class="kpi-delta">${d.secondary}: ${secondary}</div>
+      </div>`;
+  }).join('');
+
+  document.getElementById('kpi-grid').innerHTML = html;
+}
+
+/* ── Metrics table ────────────────────────────────────────────────── */
+async function renderMetricsTable() {
+  const { metrics } = await api('/api/metrics');
+  if (!metrics || !metrics.length) return;
+
+  const cols = Object.keys(metrics[0]).filter(k => k !== 'metric');
+  const colLabels = { model: 'Model', equal_weight: 'Equal-Weight', spy: 'SPY' };
+
+  const thead = `<thead><tr>
+    <th>Metric</th>
+    ${cols.map(c => `<th>${colLabels[c] || c}</th>`).join('')}
+  </tr></thead>`;
+
+  const tbody = '<tbody>' + metrics.map(row => {
+    const cells = cols.map(c => `<td>${row[c] ?? '–'}</td>`).join('');
+    return `<tr><td>${row.metric}</td>${cells}</tr>`;
+  }).join('') + '</tbody>';
+
+  document.getElementById('metrics-table').innerHTML = thead + tbody;
+}
+
+/* ── Equity curve ─────────────────────────────────────────────────── */
+async function renderEquity() {
+  const data = await api('/api/backtest');
+  if (!data.dates) return;
+
+  const series = [
+    { col: 'model_equity',        name: 'Model (Rotation)', color: PALETTE[0] },
+    { col: 'equal_weight_equity', name: 'Equal-Weight',     color: PALETTE[1] },
+    { col: 'spy_equity',          name: 'SPY Benchmark',    color: PALETTE[2] },
+  ];
+
+  const traces = series
+    .filter(s => data[s.col])
+    .map(s => ({
+      x: data.dates, y: data[s.col],
+      mode: 'lines', name: s.name,
+      line: { color: s.color, width: 2 },
+      hovertemplate: '%{y:$,.0f}<extra>' + s.name + '</extra>',
+    }));
+
+  Plotly.newPlot('chart-equity', traces,
+    layout({ title: '', xaxis: { ...DARK.xaxis, type: 'date' },
+             yaxis: { ...DARK.yaxis, tickprefix: '$', tickformat: ',.0f' },
+             hovermode: 'x unified',
+             legend: { ...DARK.legend, orientation: 'h', x: 0, y: 1.08 } }),
+    PLOTLY_CFG);
+}
+
+/* ── Drawdown ─────────────────────────────────────────────────────── */
+async function renderDrawdown() {
+  const data = await api('/api/backtest');
+  if (!data.dates) return;
+
+  const series = [
+    { eqCol: 'model_equity',        name: 'Model',        color: PALETTE[0] },
+    { eqCol: 'equal_weight_equity', name: 'Equal-Weight', color: PALETTE[1] },
+    { eqCol: 'spy_equity',          name: 'SPY',          color: PALETTE[2] },
+  ];
+
+  const traces = series
+    .filter(s => data[s.eqCol])
+    .map(s => {
+      const eq = data[s.eqCol];
+      let cumMax = 0, dd = [];
+      for (const v of eq) {
+        if (v === null) { dd.push(null); continue; }
+        if (v > cumMax) cumMax = v;
+        dd.push(cumMax > 0 ? (v / cumMax - 1) * 100 : 0);
+      }
+      return {
+        x: data.dates, y: dd,
+        mode: 'lines', name: s.name,
+        line: { color: s.color, width: 1.5 },
+        fill: 'tozeroy',
+        fillcolor: s.color.replace(/^#/, 'rgba(').replace(/(..)(..)(..)$/, (_, r, g, b) =>
+          `${parseInt(r,16)},${parseInt(g,16)},${parseInt(b,16)},0.08)`),
+        hovertemplate: '%{y:.1f}%<extra>' + s.name + '</extra>',
+      };
+    });
+
+  Plotly.newPlot('chart-drawdown', traces,
+    layout({ xaxis: { ...DARK.xaxis, type: 'date' },
+             yaxis: { ...DARK.yaxis, ticksuffix: '%' },
+             hovermode: 'x unified',
+             legend: { ...DARK.legend, orientation: 'h', x: 0, y: 1.08 } }),
+    PLOTLY_CFG);
+}
+
+/* ── Allocation charts ────────────────────────────────────────────── */
+async function renderAllocation() {
+  const { allocation } = await api('/api/allocation');
+  if (!allocation || !allocation.length) return;
+
+  const held = allocation.filter(r => r.weight > 0).sort((a, b) => a.pct_weight - b.pct_weight);
+  const all  = [...allocation].sort((a, b) => a.predicted_score - b.predicted_score);
+
+  // Weight bar
+  Plotly.newPlot('chart-alloc', [{
+    type: 'bar', orientation: 'h',
+    y: held.map(r => `${r.ETF} · ${r.Sector}`),
+    x: held.map(r => r.pct_weight),
+    marker: { color: PALETTE[0] },
+    text: held.map(r => `${r.pct_weight.toFixed(1)}%`),
+    textposition: 'outside',
+    hovertemplate: '<b>%{y}</b><br>Weight: %{x:.1f}%<extra></extra>',
+  }], layout({
+    title: { text: 'Current Weights (%)', font: { size: 13 } },
+    xaxis: { ...DARK.xaxis, ticksuffix: '%' },
+    yaxis: { ...DARK.yaxis, automargin: true },
+    margin: { t: 40, r: 60, b: 40, l: 200 },
+  }), PLOTLY_CFG);
+
+  // Score ranking
+  const colours = all.map(r => r.weight > 0 ? PALETTE[2] : PALETTE[3]);
+  Plotly.newPlot('chart-ranking', [{
+    type: 'bar', orientation: 'h',
+    y: all.map(r => r.ETF),
+    x: all.map(r => r.predicted_score),
+    marker: { color: colours },
+    text: all.map(r => r.predicted_score.toFixed(4)),
+    textposition: 'outside',
+    hovertemplate: '<b>%{y}</b><br>Score: %{x:.4f}<extra></extra>',
+  }], layout({
+    title: { text: 'Predicted Score Ranking (green=held)', font: { size: 13 } },
+    xaxis: { ...DARK.xaxis },
+    yaxis: { ...DARK.yaxis, automargin: true },
+    margin: { t: 40, r: 80, b: 40, l: 60 },
+  }), PLOTLY_CFG);
+}
+
+/* ── Feature importance ───────────────────────────────────────────── */
+async function renderFeatures() {
+  const { features } = await api('/api/feature-importance');
+  if (!features || !features.length) return;
+
+  const sorted = [...features].sort((a, b) => a.importance - b.importance);
+  Plotly.newPlot('chart-features', [{
+    type: 'bar', orientation: 'h',
+    y: sorted.map(f => f.feature),
+    x: sorted.map(f => f.importance),
+    marker: {
+      color: sorted.map(f => f.importance),
+      colorscale: [[0,'#1e3050'],[0.5,'#4f8ef7'],[1,'#818cf8']],
+      showscale: false,
+    },
+    hovertemplate: '<b>%{y}</b><br>Importance: %{x:.4f}<extra></extra>',
+  }], layout({
+    xaxis: { ...DARK.xaxis },
+    yaxis: { ...DARK.yaxis, automargin: true },
+    margin: { t: 20, r: 20, b: 40, l: 170 },
+  }), PLOTLY_CFG);
+}
+
+/* ── ETF price history ────────────────────────────────────────────── */
+async function renderETFPrices() {
+  const data = await api('/api/etf-prices');
+  if (!data.dates) return;
+
+  const etfs = Object.keys(data).filter(k => k !== 'dates');
+  const traces = etfs.map((etf, i) => ({
+    x: data.dates, y: data[etf],
+    mode: 'lines', name: etf, opacity: 0.8,
+    line: { color: PALETTE[i % PALETTE.length], width: 1.5 },
+    hovertemplate: `<b>${etf}</b>: %{y:.3f}<extra></extra>`,
+  }));
+
+  Plotly.newPlot('chart-etf', traces,
+    layout({
+      xaxis: { ...DARK.xaxis, type: 'date' },
+      yaxis: { ...DARK.yaxis },
+      hovermode: 'x unified',
+      legend: { ...DARK.legend, orientation: 'h', x: 0, y: 1.08 },
+    }),
+    PLOTLY_CFG);
+}
+
+/* ── AI Agent streaming ───────────────────────────────────────────── */
+function runAgent(agentId, outputId, btnId) {
+  const out = document.getElementById(outputId);
+  const btn = document.getElementById(btnId);
+
+  btn.disabled = true;
+  btn.textContent = '⏳ Generating…';
+  out.className = 'agent-output';
+  out.innerHTML = '<span class="cursor"></span>';
+
+  let rawText = '';
+  const src = new EventSource(`/api/agents/${agentId}`);
+
+  src.onmessage = (e) => {
+    if (e.data === '[DONE]') {
+      src.close();
+      btn.disabled = false;
+      btn.textContent = '▶ Run Again';
+      // Final render without cursor
+      out.innerHTML = marked.parse(rawText);
+      return;
+    }
+    try {
+      const { text, error } = JSON.parse(e.data);
+      if (error) {
+        src.close();
+        btn.disabled = false;
+        btn.textContent = '▶ Run Again';
+        out.innerHTML = `<div class="agent-error">⚠️ ${error}</div>`;
+        return;
+      }
+      rawText += text;
+      // Stream: show parsed markdown with cursor at end
+      out.innerHTML = marked.parse(rawText) + '<span class="cursor"></span>';
+      out.scrollTop = out.scrollHeight;
+    } catch {}
+  };
+
+  src.onerror = () => {
+    src.close();
+    btn.disabled = false;
+    btn.textContent = '▶ Run Again';
+    if (!rawText) {
+      out.innerHTML = `<div class="agent-error">⚠️ Could not connect to API server.</div>`;
+    } else {
+      out.innerHTML = marked.parse(rawText);
+    }
+  };
+}
+
+/* ── Init ─────────────────────────────────────────────────────────── */
+async function init() {
+  await checkStatus();
+  // Run all data fetches concurrently
+  await Promise.allSettled([
+    renderKPIs(),
+    renderMetricsTable(),
+    renderEquity(),
+    renderDrawdown(),
+    renderAllocation(),
+    renderFeatures(),
+    renderETFPrices(),
+  ]);
+}
+
+init();
+</script>
+</body>
+</html>
