@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c ' *)",
+      "Bash(pip install *)",
+      "Bash(grep -v \"^\\\\s*$\")",
+      "Bash(python main.py --skip-download)",
+      "Bash(Test-Path \"c:\\\\Users\\\\adam\\\\OneDrive\\\\Desktop\\\\zino_evya\\\\.env\")",
+      "Bash(python -c \"import os; print\\(os.path.exists\\(r'c:\\\\Users\\\\adam\\\\OneDrive\\\\Desktop\\\\zino_evya\\\\.env'\\)\\)\")",
+      "Bash(python main.py)",
+      "Bash(python main.py --skip-download --skip-train)"
+    ]
+  }
+}

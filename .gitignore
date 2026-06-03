@@ -1,0 +1,43 @@
+# Environment
+.env
+*.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+venv/
+env/
+.venv/
+
+Book3.xlsx
+# Data – raw and processed files are reproducible; don't commit large binaries
+data/raw/
+data/processed/
+data/artifacts/
+
+# Keep directory structure
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!data/artifacts/.gitkeep
+
+# Reports (auto-generated)
+reports/evaluation_report.md
+reports/model_card.md
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# IDE
+.vscode/
+.idea/
+*.code-workspace
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

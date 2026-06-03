@@ -1,0 +1,38 @@
+# ETF Sector Rotation – University ML Project
+# Install: pip install -r requirements.txt
+
+# Core data stack
+numpy>=1.24.0
+pandas>=2.0.0
+openpyxl>=3.1.0          # Excel reading
+
+# Market data
+yfinance>=0.2.40
+
+# FRED / ALFRED macro data
+fredapi>=0.5.1
+python-dotenv>=1.0.0      # loads FRED_API_KEY from .env automatically
+
+# Machine learning
+xgboost>=2.0.0
+scikit-learn>=1.3.0
+scipy>=1.11.0
+joblib>=1.3.0
+
+# Visualisation
+matplotlib>=3.7.0
+seaborn>=0.12.0
+plotly>=5.18.0
+
+# Dashboard
+streamlit>=1.32.0
+
+# Report formatting
+tabulate>=0.9.0           # pandas .to_markdown()
+
+# Optional: parquet support
+pyarrow>=14.0.0
+
+# Notebook support (optional)
+jupyter>=1.0.0
+ipykernel>=6.0.0
