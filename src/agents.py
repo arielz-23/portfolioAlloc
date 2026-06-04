@@ -18,9 +18,9 @@ import pandas as pd
 import vertexai
 from vertexai.generative_models import GenerativeModel, GenerationConfig
 
-# Vertex AI uses "gemini-2.0-flash-lite" as the model ID for the flash-lite family.
+# Vertex AI uses "gemini-3.1-flash-lite" as the model ID for the flash-lite family.
 # Override via GEMINI_MODEL env var if a newer version becomes available.
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash-lite")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite")
 
 _VERTEX_INITIALIZED = False
 

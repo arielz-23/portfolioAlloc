@@ -1,0 +1,39 @@
+# Version control
+.git/
+.gitignore
+
+# Secrets — never bake into image; set as Cloud Run env vars instead
+.env
+*.env
+
+# Python bytecode
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Raw Excel source (large; parquet files in data/raw/ are used instead)
+Book3.xlsx
+
+# Notebooks & scripts (not needed at runtime)
+notebooks/
+scripts/
+*.ipynb
+.ipynb_checkpoints/
+
+# OS artefacts
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.code-workspace
