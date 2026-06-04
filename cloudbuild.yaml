@@ -41,7 +41,7 @@ steps:
       - --region=us-central1
       - --platform=managed
       - --allow-unauthenticated
-      - --set-env-vars=GOOGLE_CLOUD_PROJECT=$PROJECT_ID,GOOGLE_CLOUD_LOCATION=us-central1,GCS_BUCKET=$PROJECT_ID-portfolio-data
+      - --set-env-vars=GOOGLE_CLOUD_PROJECT=$PROJECT_ID,GOOGLE_CLOUD_LOCATION=global,GCS_BUCKET=$PROJECT_ID-portfolio-data
       - --memory=2Gi
       - --cpu=1
       - --timeout=300
@@ -59,7 +59,7 @@ steps:
       - portfolio-pipeline
       - --image=gcr.io/$PROJECT_ID/portfolio-job:latest
       - --region=us-central1
-      - --set-env-vars=GOOGLE_CLOUD_PROJECT=$PROJECT_ID,GOOGLE_CLOUD_LOCATION=us-central1,GCS_BUCKET=$PROJECT_ID-portfolio-data
+      - --set-env-vars=GOOGLE_CLOUD_PROJECT=$PROJECT_ID,GOOGLE_CLOUD_LOCATION=global,GCS_BUCKET=$PROJECT_ID-portfolio-data
       - --memory=4Gi
       - --cpu=2
       - --task-timeout=3600

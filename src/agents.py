@@ -31,7 +31,7 @@ def _client() -> genai.Client:
         return genai.Client(api_key=api_key)
     # Fall back to Vertex AI (uses ADC — works automatically on Cloud Run)
     project = os.getenv("GOOGLE_CLOUD_PROJECT", "")
-    location = os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")
+    location = os.getenv("GOOGLE_CLOUD_LOCATION", "global")
     if not project:
         raise ValueError(
             "Set GEMINI_API_KEY or GOOGLE_CLOUD_PROJECT in your .env file."
