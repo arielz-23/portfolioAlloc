@@ -42,7 +42,7 @@ def _init_vertex() -> None:
     vertexai.init(project=project, location=location)
     _VERTEX_INITIALIZED = True
 
-
+ 
 def _stream(system: str, user: str) -> Generator[str, None, None]:
     """Stream a Gemini response as text chunks via Vertex AI."""
     _init_vertex()
