@@ -1,24 +1,37 @@
 steps:
-  # 1 — Build the image
-  - id: build
+  # ── Build dashboard image ──────────────────────────────────────────
+  - id: build-dashboard
     name: gcr.io/cloud-builders/docker
     args:
       - build
       - --tag=gcr.io/$PROJECT_ID/portfolio-dashboard:latest
+      - --file=Dockerfile
       - .
 
-  # 2 — Push to Container Registry
-  - id: push
+  # ── Build pipeline job image ───────────────────────────────────────
+  - id: build-job
     name: gcr.io/cloud-builders/docker
-    waitFor: [build]
     args:
-      - push
-      - gcr.io/$PROJECT_ID/portfolio-dashboard:latest
+      - build
+      - --tag=gcr.io/$PROJECT_ID/portfolio-job:latest
+      - --file=Dockerfile.job
+      - .
 
-  # 3 — Deploy to Cloud Run
-  - id: deploy
+  # ── Push both images ───────────────────────────────────────────────
+  - id: push-dashboard
+    name: gcr.io/cloud-builders/docker
+    waitFor: [build-dashboard]
+    args: [push, gcr.io/$PROJECT_ID/portfolio-dashboard:latest]
+
+  - id: push-job
+    name: gcr.io/cloud-builders/docker
+    waitFor: [build-job]
+    args: [push, gcr.io/$PROJECT_ID/portfolio-job:latest]
+
+  # ── Deploy dashboard Cloud Run Service ────────────────────────────
+  - id: deploy-dashboard
     name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
-    waitFor: [push]
+    waitFor: [push-dashboard]
     entrypoint: gcloud
     args:
       - run
@@ -28,16 +41,34 @@ steps:
       - --region=us-central1
       - --platform=managed
       - --allow-unauthenticated
-      - --set-env-vars=GOOGLE_CLOUD_PROJECT=$PROJECT_ID,GOOGLE_CLOUD_LOCATION=us-central1
+      - --set-env-vars=GOOGLE_CLOUD_PROJECT=$PROJECT_ID,GOOGLE_CLOUD_LOCATION=us-central1,GCS_BUCKET=$PROJECT_ID-portfolio-data
       - --memory=2Gi
       - --cpu=1
       - --timeout=300
       - --concurrency=20
 
+  # ── Deploy pipeline Cloud Run Job ──────────────────────────────────
+  - id: deploy-job
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    waitFor: [push-job]
+    entrypoint: gcloud
+    args:
+      - run
+      - jobs
+      - deploy
+      - portfolio-pipeline
+      - --image=gcr.io/$PROJECT_ID/portfolio-job:latest
+      - --region=us-central1
+      - --set-env-vars=GOOGLE_CLOUD_PROJECT=$PROJECT_ID,GOOGLE_CLOUD_LOCATION=us-central1,GCS_BUCKET=$PROJECT_ID-portfolio-data
+      - --memory=4Gi
+      - --cpu=2
+      - --task-timeout=3600
+      - --max-retries=1
+
 images:
   - gcr.io/$PROJECT_ID/portfolio-dashboard:latest
+  - gcr.io/$PROJECT_ID/portfolio-job:latest
 
 options:
-  # Fixes "build.service_account requires logs_bucket" org policy error
   logging: CLOUD_LOGGING_ONLY
   machineType: E2_HIGHCPU_8

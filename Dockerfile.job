@@ -1,0 +1,25 @@
+# Pipeline Job container — runs main.py daily, uploads outputs to GCS.
+# Does NOT bake in data (downloads fresh data at runtime via yfinance + FRED).
+
+FROM python:3.11-slim
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip \
+ && pip install --no-cache-dir -r requirements.txt
+
+# Source only — no data baked in
+COPY src/  ./src/
+COPY main.py .
+
+# Required env vars at runtime:
+#   GOOGLE_CLOUD_PROJECT   – GCP project (for Vertex AI + GCS)
+#   GCS_BUCKET             – bucket to upload artifacts to
+#   FRED_API_KEY           – for macro data download (optional but recommended)
+
+CMD ["python", "main.py"]

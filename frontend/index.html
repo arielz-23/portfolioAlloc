@@ -251,7 +251,15 @@
       <div class="header-sub">XGBoost · Vertex AI Gemini · University Final Project</div>
     </div>
   </div>
-  <span id="status-badge">Loading…</span>
+  <div style="display:flex;align-items:center;gap:10px;">
+    <button id="refresh-btn" onclick="refreshData()" style="
+      background:transparent;border:1px solid var(--border);border-radius:8px;
+      color:var(--muted);font-size:12px;font-weight:600;padding:5px 12px;
+      cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:5px;">
+      🔄 Refresh
+    </button>
+    <span id="status-badge">Loading…</span>
+  </div>
 </header>
 
 <main>
@@ -697,6 +705,34 @@ function runAgent(agentId, outputId, btnId) {
       out.innerHTML = marked.parse(rawText);
     }
   };
+}
+
+/* ── Refresh data from GCS ────────────────────────────────────────── */
+async function refreshData() {
+  const btn = document.getElementById('refresh-btn');
+  btn.textContent = '⏳ Refreshing…';
+  btn.disabled = true;
+  try {
+    const r = await fetch('/api/refresh');
+    const data = await r.json();
+    if (data.status === 'ok') {
+      // Reload all charts with fresh data
+      await Promise.allSettled([
+        renderKPIs(), renderMetricsTable(),
+        renderEquity(), renderDrawdown(),
+        renderAllocation(), renderFeatures(), renderETFPrices(),
+      ]);
+      await checkStatus();
+      btn.textContent = '✓ Updated';
+      setTimeout(() => { btn.textContent = '🔄 Refresh'; btn.disabled = false; }, 2000);
+    } else {
+      btn.textContent = data.reason || data.detail || 'No GCS';
+      setTimeout(() => { btn.textContent = '🔄 Refresh'; btn.disabled = false; }, 3000);
+    }
+  } catch {
+    btn.textContent = '✗ Failed';
+    setTimeout(() => { btn.textContent = '🔄 Refresh'; btn.disabled = false; }, 3000);
+  }
 }
 
 /* ── Init ─────────────────────────────────────────────────────────── */

@@ -174,6 +174,14 @@ def main() -> None:
     # 6. Evaluation
     metrics = step_evaluate(results, panel, models)
 
+    # ── Upload to GCS (if configured) ────────────────────────────────
+    import os
+    if os.getenv("GCS_BUCKET"):
+        banner("STEP 7 – Upload Artifacts to GCS")
+        from gcs_sync import upload_artifacts
+        n = upload_artifacts()
+        logger.info(f"Uploaded {n} files to gs://{os.getenv('GCS_BUCKET')}")
+
     # ── Summary ───────────────────────────────────────────────────────
     elapsed = time.time() - t0
     banner(f"Pipeline complete in {elapsed:.1f}s")

@@ -15,47 +15,45 @@ from typing import Generator
 
 import numpy as np
 import pandas as pd
-import vertexai
-from vertexai.generative_models import GenerativeModel, GenerationConfig
+from google import genai
+from google.genai import types
 
-# Vertex AI uses "gemini-3.1-flash-lite" as the model ID for the flash-lite family.
-# Override via GEMINI_MODEL env var if a newer version becomes available.
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite")
-
-_VERTEX_INITIALIZED = False
 
 
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
 
-def _init_vertex() -> None:
-    global _VERTEX_INITIALIZED
-    if _VERTEX_INITIALIZED:
-        return
+def _client() -> genai.Client:
+    api_key = os.getenv("GEMINI_API_KEY", "")
+    if api_key:
+        return genai.Client(api_key=api_key)
+    # Fall back to Vertex AI (uses ADC — works automatically on Cloud Run)
     project = os.getenv("GOOGLE_CLOUD_PROJECT", "")
     location = os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")
     if not project:
         raise ValueError(
-            "GOOGLE_CLOUD_PROJECT not set. Add it to .env or set the environment variable."
+            "Set GEMINI_API_KEY or GOOGLE_CLOUD_PROJECT in your .env file."
         )
-    vertexai.init(project=project, location=location)
-    _VERTEX_INITIALIZED = True
+    return genai.Client(vertexai=True, project=project, location=location)
 
- 
+
 def _stream(system: str, user: str) -> Generator[str, None, None]:
-    """Stream a Gemini response as text chunks via Vertex AI."""
-    _init_vertex()
-    model = GenerativeModel(
-        GEMINI_MODEL,
+    """Stream a Gemini response as text chunks via google-genai + Vertex AI."""
+    client = _client()
+    config = types.GenerateContentConfig(
         system_instruction=system,
+        max_output_tokens=1024,
+        temperature=0.3,
     )
-    config = GenerationConfig(max_output_tokens=1024, temperature=0.3)
-    responses = model.generate_content(user, stream=True, generation_config=config)
-    for resp in responses:
-        text = resp.text
-        if text:
-            yield text
+    for chunk in client.models.generate_content_stream(
+        model=GEMINI_MODEL,
+        contents=user,
+        config=config,
+    ):
+        if chunk.text:
+            yield chunk.text
 
 
 def _fmt_kv(d: dict) -> str:

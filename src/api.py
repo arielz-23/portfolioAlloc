@@ -14,19 +14,23 @@ Launch with:
 from __future__ import annotations
 
 import json
+import logging
+import os
 import sys
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 import pandas as pd
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import config as cfg
+
+logger = logging.getLogger("api")
 
 app = FastAPI(title="ETF Sector Rotation API", version="1.0.0")
 
@@ -54,8 +58,30 @@ class AppState:
 _state = AppState()
 
 
-@app.on_event("startup")
-def _load_artifacts() -> None:
+def _pull_from_gcs() -> bool:
+    """Download latest artifacts from GCS. Returns True if successful."""
+    if not os.getenv("GCS_BUCKET"):
+        return False
+    try:
+        from gcs_sync import download_artifacts
+        n = download_artifacts()
+        logger.info(f"GCS pull complete: {n} files")
+        return True
+    except Exception as exc:
+        logger.warning(f"GCS pull failed (using local data): {exc}")
+        return False
+
+
+def _reload_state() -> None:
+    """(Re)load all artifacts from local disk into _state."""
+    _state.backtest = None
+    _state.allocation = None
+    _state.panel = None
+    _state.metrics = None
+    _state.feat_imp = None
+    _state.etf_prices = None
+    _state.ready = False
+
     if cfg.BACKTEST_CSV.exists():
         _state.backtest = pd.read_csv(cfg.BACKTEST_CSV, index_col="Date", parse_dates=True)
 
@@ -91,6 +117,13 @@ def _load_artifacts() -> None:
     _state.ready = (
         _state.backtest is not None and _state.allocation is not None
     )
+    logger.info(f"State loaded — ready={_state.ready}")
+
+
+@app.on_event("startup")
+def _load_artifacts() -> None:
+    _pull_from_gcs()   # no-op if GCS_BUCKET not set
+    _reload_state()
 
 
 # ---------------------------------------------------------------------------
@@ -129,7 +162,22 @@ def status():
         "has_panel": _state.panel is not None,
         "has_metrics": _state.metrics is not None,
         "has_feat_imp": _state.feat_imp is not None,
+        "gcs_enabled": bool(os.getenv("GCS_BUCKET")),
     }
+
+
+@app.get("/api/refresh")
+def refresh():
+    """Pull latest artifacts from GCS and reload into memory.
+    Call this after the pipeline job finishes to update the live dashboard."""
+    if not os.getenv("GCS_BUCKET"):
+        return JSONResponse({"status": "skipped", "reason": "GCS_BUCKET not configured"})
+    try:
+        pulled = _pull_from_gcs()
+        _reload_state()
+        return {"status": "ok", "gcs_pulled": pulled, "dashboard_ready": _state.ready}
+    except Exception as exc:
+        return JSONResponse({"status": "error", "detail": str(exc)}, status_code=500)
 
 
 @app.get("/api/metrics")

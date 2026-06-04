@@ -1,0 +1,37 @@
+# .gcloudignore — controls what is uploaded to Cloud Build.
+# Unlike .gitignore, this intentionally INCLUDES data/ and reports/
+# so the pre-computed pipeline artifacts are baked into the Docker image.
+
+.git/
+.gitignore
+.gcloudignore
+.env
+*.env
+
+# Python bytecode
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Raw Excel source (not needed — parquet files in data/raw/ are used)
+Book3.xlsx
+
+# Notebooks & scripts (not needed at runtime)
+notebooks/
+scripts/
+*.ipynb
+.ipynb_checkpoints/
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+*.log
+.vscode/
+.idea/
+*.code-workspace
