@@ -4,18 +4,16 @@ steps:
     name: gcr.io/cloud-builders/docker
     args:
       - build
-      - --tag=gcr.io/$PROJECT_ID/portfolio-dashboard:$SHORT_SHA
       - --tag=gcr.io/$PROJECT_ID/portfolio-dashboard:latest
       - .
 
-  # 2 — Push both tags to Container Registry
+  # 2 — Push to Container Registry
   - id: push
     name: gcr.io/cloud-builders/docker
     waitFor: [build]
     args:
       - push
-      - --all-tags
-      - gcr.io/$PROJECT_ID/portfolio-dashboard
+      - gcr.io/$PROJECT_ID/portfolio-dashboard:latest
 
   # 3 — Deploy to Cloud Run
   - id: deploy
@@ -26,7 +24,7 @@ steps:
       - run
       - deploy
       - portfolio-dashboard
-      - --image=gcr.io/$PROJECT_ID/portfolio-dashboard:$SHORT_SHA
+      - --image=gcr.io/$PROJECT_ID/portfolio-dashboard:latest
       - --region=us-central1
       - --platform=managed
       - --allow-unauthenticated
@@ -38,7 +36,6 @@ steps:
 
 images:
   - gcr.io/$PROJECT_ID/portfolio-dashboard:latest
-  - gcr.io/$PROJECT_ID/portfolio-dashboard:$SHORT_SHA
 
 options:
   # Fixes "build.service_account requires logs_bucket" org policy error
