@@ -22,4 +22,6 @@ COPY main.py .
 #   GCS_BUCKET             – bucket to upload artifacts to
 #   FRED_API_KEY           – for macro data download (optional but recommended)
 
-CMD ["python", "main.py"]
+# --skip-download  → reuses ETF parquet files from GCS (Book3.xlsx not in container)
+# --skip-train     → reuses existing models, only runs fresh inference + allocation
+CMD ["python", "main.py", "--skip-download", "--skip-train"]
